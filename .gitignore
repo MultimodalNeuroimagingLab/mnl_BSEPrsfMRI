@@ -216,3 +216,18 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# macOS
+.DS_Store
+
+# MATLAB
+*.asv
+*.autosave
+
+# Local data
+data/
+derivatives/
+
+# Neuroimaging outputs
+*.nii
+*.nii.gz
