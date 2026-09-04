@@ -231,3 +231,5 @@ derivatives/
 # Neuroimaging outputs
 *.nii
 *.nii.gz
+~$*
+.DS_Store
