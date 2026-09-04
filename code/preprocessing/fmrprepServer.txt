@@ -1,0 +1,16 @@
+bids_root_dir=/projectFolder
+subj=sub-01
+fmriprep-docker $bids_root_dir $bids_root_dir/derivatives/fMRIprep \
+participant \
+  --skip_bids_validation \
+  --participant-label $subj \
+  --md-only-boilerplate \
+  --fs-license-file /Applications/freesurfer/8.2.0/license.txt \
+  --fs-subjects-dir /projectFolder/derivatives/fMRIprep/fs \
+  --output-spaces MNI152NLin6Asym:res-native T1w fsnative func MNI152NLin2009cAsym \
+  --nthreads 3 \
+  --mem_mb 44000 \
+  --low-mem \
+  --stop-on-first-crash \
+  --work-dir /projectFolder/fMRIprep_work \
+  --me-output-echos
