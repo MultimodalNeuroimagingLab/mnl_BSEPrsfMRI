@@ -28,6 +28,7 @@ localDataPath = fullfile(projectDir, 'data');
 
 addpath(genpath(fullfile(codeDir, 'functions')));
 
+subjects = {'01', '02'};
 
 %% Dependencies
 %
