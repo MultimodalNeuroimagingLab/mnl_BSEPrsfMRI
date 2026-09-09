@@ -1,39 +1,45 @@
-%% Functional networks - SPES vs resting-state fMRI
-% Select electrodes in the areas of interest for each subject.
+%% Electrode network mapping for BSEP-rsfMRI analysis
 %
+% Register electrode coordinates to resting-state fMRI anatomical space,
+% assign Yeo network labels, render cortical network locations, and compute
+% electrode distance relative to gray and white matter.
+%
+% This script is part of the mnl_BSEPrsfMRI workflow.
+%
+% Author: Maria Guadalupe Yanez Ramos
+% Developed with scientific and technical guidance from Dora Hermes
+% and the Multimodal Neuroimaging Lab (MNL) team.
 % May 2026
-% Authors: Maria Guadalupe Yanez Ramos (MGYR) and Dora Hermes (DH). 
-%
-% This script:
-%   1. Registers electrode coordinates from electrode T1 space to
-%      resting-state fMRI T1 space.
-%   2. Creates surface files in T1 space.
-%   3. Assigns Yeo networks to electrodes.
-%   4. Renders electrode/network locations.
-%   5. Computes electrode distance to gray and white matter.
+
+
+
 
 clc;
 clearvars;
+
 
 %% Configuration
 
 % Add project-specific code here.
 % External dependencies should preferably be added separately or documented
 % in the README.
-codePath = '';
-if ~isempty(codePath)
-    addpath(genpath(codePath));
-end
 
-localDataPath = '';   % Path to BIDS dataset
 
-subjects   = {'01'};
-mmDistance = 3;       % Radius around electrode, in mm
-yeo        = 7;       % Yeo parcellation: 7-network atlas
-hem        = 1;
+projectDir = fileparts('');
+localDataPath = fullfile(projectDir, 'data');
+addpath(genpath([projectDir,'/code']));
+subjects = { ...
+    '01', ...
+    '02' ...
+    };
+
+mmDistance = 3;
+yeo = 7;
+hem = [1 2];
 
 ieegSession = 'ieeg01';
 fmriSession = 'compact3T01';
+
 
 %% Dependencies
 %
@@ -55,7 +61,8 @@ for iSub = 1:numel(subjects)
 
     %% Load anatomical images
 
-    % T1 image used for electrode localization.
+    % T1 image used for electrode localization. Usually saved in sourcedata
+    % and freesurfer
     acpcT1Name = fullfile( ...
         localDataPath, ...
         'derivatives', ...
@@ -79,7 +86,7 @@ for iSub = 1:numel(subjects)
 
     %% Compute transformation to resting-state fMRI T1 space
 
-    acpc2rsfMRIXform = rsfMRIAlignToT1( ...
+    acpc2rsfMRIXform = ssf_rsfMRIAlignToT1( ...
         acpcT1, ...
         T1preproc, ...
         [], ...
@@ -176,11 +183,19 @@ end
 
 %% Assign Yeo network to each electrode
 
-electrodesYeo(localDataPath, mmDistance, subjects, yeo);
+ssf_assign_electrodes_to_yeo( ...
+    localDataPath, ...
+    mmDistance, ...
+    subjects, ...
+    yeo);
 
 %% Render Yeo networks and electrodes
 
-Yeo_Render(localDataPath, subjects, hem, yeo);
+ssf_render_yeo_networks( ...
+    localDataPath, ...
+    subjects, ...
+    hem, ...
+    yeo);
 
 %% Measure electrode distance to gray and white matter
 %
