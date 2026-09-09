@@ -27,7 +27,7 @@ localDataPath = fullfile(projectDir, 'data');
 addpath(genpath(fullfile(codeDir, 'functions')));
 %% Subjects
 
-all_subjects = {'01', '02'};
+%all_subjects = {'01', '02'};
 
 %% Select subjects and electrodes
 
