@@ -18,27 +18,15 @@ clc;
 clearvars;
 
 
-%% Configuration
+%% Project paths
 
-% Add project-specific code here.
-% External dependencies should preferably be added separately or documented
-% in the README.
+thisFile = mfilename('fullpath');
+codeDir = fileparts(thisFile);
+projectDir = fileparts(codeDir);
 
-
-projectDir = fileparts('');
 localDataPath = fullfile(projectDir, 'data');
-addpath(genpath([projectDir,'/code']));
-subjects = { ...
-    '01', ...
-    '02' ...
-    };
 
-mmDistance = 3;
-yeo = 7;
-hem = [1 2];
-
-ieegSession = 'ieeg01';
-fmriSession = 'compact3T01';
+addpath(genpath(fullfile(codeDir, 'functions')));
 
 
 %% Dependencies

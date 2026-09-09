@@ -1,33 +1,32 @@
 function acpcXform = ssf_rsfMRIAlignToT1(acpcT1, T1preproc, t1MaskFile, useStdXformFlag, figNum, unwarpDti, sepParam)
-% acpcXform = dtiRawAlignToT1([b0File=uigetfile], [t1=uigetfile], [outAcpcXform], [t1MaskFile=[]], [useStdXformFlag=true], [figNum=0], [unwarpDti=false])
+% ssf_rsfMRIAlignToT1
 %
-% Returns a transforms that aligns the B0 image to the t1-weighted image in
-% acpc space.  It also writes that matrix to disk in the file ::
+% Align the T1-weighted anatomical image used for electrode localization
+% to the preprocessed T1-weighted anatomical image associated with
+% resting-state fMRI.
 %
-% b0File:  File name
-% t1:      File name
-% outAcpcXform: The output file name containing the transform.  Default is
-% XX
-% 
-% If useStdXformFlag==false, the b0 qto_xyz transform will be used for the
-% coarse alignment. Otherwise, this transform will be used to estimate
-% mirror-flips, but it's detailed rotation and translations components will
-% be ignored. If your subjects were positioned in the scanner to be
-% roughly ac-pc aligned, then use useStdXformFlag==false. If they were
-% positioned any-which-way, but the Rx was adjusted to acquire roughly
-% ac-pc aligned images, then use useStdXformFlag==true. If you have no clue
-% what this all means, try useStdXformFlag==true and hope for the best.
+% INPUTS
+%   acpcT1          - T1 image used for electrode localization
+%   T1preproc       - Preprocessed T1 image associated with rs-fMRI
+%   t1MaskFile      - Optional target T1 brain mask
+%   useStdXformFlag - Use canonical transform for initial alignment
+%   figNum          - Figure number; >0 enables SPM coregistration display
+%   unwarpDti       - Legacy option controlling 6- vs 12-parameter fit
+%   sepParam        - SPM coregistration sampling separation
 %
-% Set unwarpDti to true to allow a 12 parameter fit of the mean
-% b=0 to the t1. Be careful- if you don't have quality, whole-brain
-% DTI data, this can do bad things! Also, if you don't brain-mask
-% the t1, you will often get the dti data aligned to the scalp .
+% OUTPUT
+%   acpcXform       - Transformation from electrode-localization T1 space
+%                     to rs-fMRI T1 space
+%
+% Adapted from the Vistasoft function dtiRawAlignToT1.
+% Original implementation by Robert F. Dougherty (RFD), Vista Lab.
+%
+% Adaptation for resting-state fMRI:
+% Maria Guadalupe Yanez Ramos
+% Developed with scientific and technical guidance from Dora Hermes
+% and the Multimodal Neuroimaging Lab (MNL) team.
+% 2025-2026
 
-%
-% If figNum>0, then a figure displaying the alignment will be shown.
-%
-% HISTORY:
-% 2007.04.23 RFD: wrote it. MGYR modifications for resting state 2025
 
 %% Set defaults
 
@@ -51,48 +50,11 @@ else
   estParams.params = [0 0 0 0 0 0]; % 6-param Rigid body
 end
 
-%% Load the b0 data (in NIFTI format)
-% if(~exist('b0File','var') || isempty(acpcT1))
-%     [f,p] = uigetfile({'*.nii.gz;*.nii';'*.*'}, 'Select the mean b0 NIFTI dataset...');
-%     if(isnumeric(f)) error('User cancelled.'); end
-%     acpcT1 = fullfile(p,f);
-% end
-% if(ischar(acpcT1))
-%     % b0File can be a path to the file or the file itself
-%     [dataDir,inBaseName] = fileparts(acpcT1);
-% else
-%     [dataDir,inBaseName] = fileparts(acpcT1.fname);
-% end
-% [~,inBaseName,~] = fileparts(inBaseName);
-% if(isempty(dataDir)) dataDir = pwd; end
-% 
-% if(~exist('t1','var') || isempty(T1preproc))
-%     [f,p] = uigetfile({'*.nii.gz';'*.mat'},'Select a T1 file or acpc transform mat file...',fullfile(dataDir,'t1.nii.gz'));
-%     if(isnumeric(f)), disp('Conversion canceled.'); return; end
-%     T1preproc = fullfile(p,f);
-% end
-% 
-% if(~exist('outAcpcXform','var') || isempty(outAcpcXform))
-%     outAcpcXform = fullfile(dataDir,[inBaseName 'AcpcXform']);
-% end
-% 
-% if(~exist('useStdXformFlag','var') || isempty(useStdXformFlag))
-%     useStdXformFlag = true;
-% end
-% 
-% if(~exist('figNum','var') || isempty(figNum))
-%     figNum = 0;
-% end
-% 
-% if(ischar(acpcT1))
-%     disp(['Loading b0 data ' acpcT1 '...']);
-%     acpcT1 = niftiRead(acpcT1);
-% end
-% 
 
-%% Align the mean B0 to the T1 to get the ac-pc xform
-%
-fprintf('[%s] Aligning mean b=0 to t1...\n',mfilename);
+%% Align electrode-localization T1 to rs-fMRI T1
+
+fprintf('[%s] Aligning electrode-localization T1 to rs-fMRI T1...\n', ...
+    mfilename);
 
 source.uint8 = uint8(round(mrAnatHistogramClip(double(acpcT1.data),0.4,0.99)*255));
 % % Blur images given the specified highest-resolution sampling density
@@ -104,7 +66,7 @@ if (acpcT1.qform_code>0)
 elseif (acpcT1.sform_code>0)
   source.mat = acpcT1.sto_xyz;
 else
-  error('Requires that b0File qform_code>1 OR sform_code>1.');
+  error('Source T1 requires qform_code>0 or sform_code>0.');
 end
 
 % if(ischar(T1preproc))
