@@ -1,5 +1,5 @@
-function electrodesYeo(localDataPath, mmDistance, all_subjects, yeo)
-% electrodesYeo Assign Yeo network labels to electrodes.
+function ssf_assign_electrodes_to_yeo(localDataPath, mmDistance, all_subjects, yeo)
+% ssf_assign_electrodes_to_yeo Assign Yeo network labels to electrodes.
 %
 % IMPORTANT: First run mri_surf2surf from fsaverage to individual space.
 %
@@ -9,8 +9,10 @@ function electrodesYeo(localDataPath, mmDistance, all_subjects, yeo)
 %   all_subjects  - Cell array of subject labels
 %   yeo           - Yeo parcellation (7 or 17)
 %
+% Author: Maria Guadalupe Yanez Ramos
+% Developed with scientific and technical guidance from Dora Hermes
+% and the Multimodal Neuroimaging Lab (MNL) team.
 % May 2026
-% Authors: Maria Guadalupe Yanez Ramos (MGYR) and Dora Hermes (DH). 
 
     ses_label = 'ieeg01';
 
@@ -140,7 +142,7 @@ function electrodesYeo(localDataPath, mmDistance, all_subjects, yeo)
 
         for ii = 1:elect_num
 
-            LabelsYeo = [];
+            LabelsYeo = strings(0, 1);
 
             % Select hemisphere
             if strcmpi(loc_info.hemisphere{ii}, 'L')
@@ -182,8 +184,7 @@ function electrodesYeo(localDataPath, mmDistance, all_subjects, yeo)
                             electrode_Yeo_areas(j) = ...
                                 electrode_Yeo_areas(j) + 1;
 
-                            LabelsYeo = ...
-                                [LabelsYeo Yeo_ROI_Names(j)];
+                            LabelsYeo(end + 1, 1) = Yeo_ROI_Names(j);
                         end
                     end
                 end
@@ -198,10 +199,14 @@ function electrodesYeo(localDataPath, mmDistance, all_subjects, yeo)
             TableYeoElectrodes.Electrode_name{njj} = ...
                 string(loc_info.name{ii});
 
-            uniqueLabels = unique(LabelsYeo);
-
-            TableYeoElectrodes.Yeo_Labels{njj} = ...
-                strjoin(uniqueLabels, ', ');
+            uniqueLabels = unique(LabelsYeo, 'stable');
+            
+            if isempty(uniqueLabels)
+                TableYeoElectrodes.Yeo_Labels{njj} = '';
+            else
+                TableYeoElectrodes.Yeo_Labels{njj} = ...
+                    char(strjoin(uniqueLabels, ', '));
+            end
 
             TableYeoElectrodes{njj, 1:size(eWa,2)} = eWa;
 

@@ -1,6 +1,5 @@
 %% plot inflated brains
-function Yeo_Render(localDataPath, all_subjects, hem, yeo, targetNetwork)
-% Yeo_Render
+function ssf_render_yeo_networks(localDataPath, all_subjects, hem, yeo, targetNetwork)
 %
 % Purpose:
 %   Plot Yeo networks on the subject inflated surface with electrodes.
@@ -12,8 +11,8 @@ function Yeo_Render(localDataPath, all_subjects, hem, yeo, targetNetwork)
 %   targetNetwork = 'Control'      -> plot only Control network
 %
 % Example:
-%   Yeo_Render(localDataPath, {'01'}, 1, 7, 'Visual')
-%   Yeo_Render(localDataPath, {'01'}, [1 2], 7, 'all')
+%   ssf_render_yeo_networks(localDataPath, {'01'}, 1, 7, 'Visual')
+%   ssf_render_yeo_networks(localDataPath, {'01'}, [1 2], 7, 'all')
 %
 % IMPORTANT:
 %   First run the Yeo surf2surf step so the subject has:
@@ -26,6 +25,10 @@ function Yeo_Render(localDataPath, all_subjects, hem, yeo, targetNetwork)
 %   hem           = 1 for left, 2 for right, or [1 2]
 %   yeo           = 7 or 17
 %   targetNetwork = optional network name or 'all'
+% Author: Maria Guadalupe Yanez Ramos
+% Developed with scientific and technical guidance from Dora Hermes
+% and the Multimodal Neuroimaging Lab (MNL) team.
+% May 2026
 
     if nargin < 5 || isempty(targetNetwork)
         targetNetwork = 'all';
