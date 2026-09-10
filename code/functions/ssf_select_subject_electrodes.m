@@ -13,12 +13,13 @@ function vcm_Subjects = ssf_select_subject_electrodes(localDataPath, all_subject
 %   5. Excludes electrodes outside the selected networks, electrodes with
 %      relative distance < -1, and electrodes labeled exactly as SOZ.
 %   6. Saves the updated loc_info table.
-%   7. Identifies real bipolar stimulation pairs from the CCEP events files.
-%   8. Keeps a pair when at least one of its contacts passes the electrode
-%      selection criteria.
-%   9. If a pair occurs in multiple valid runs, selects the first numerical
-%      run.
-%  10. Returns one row per bipolar stimulation pair in vcm_Subjects.
+%   7. Identifies real bipolar stimulation pairs from CCEP events files.
+%   8. Keeps a pair when at least one contact passes electrode selection.
+%   9. Requires the run to contain events, channels, and MEF data.
+%  10. If a pair occurs in multiple usable runs, selects the run with the
+%      largest number of trials; ties are resolved using the first
+%      numerical run.
+%  11. Returns one row per bipolar stimulation pair in vcm_Subjects.
 %
 % INPUTS
 %   localDataPath - Path to local BIDS dataset
@@ -45,9 +46,7 @@ for ss = 1:numel(all_subjects)
 
     fprintf('\nProcessing sub-%s...\n', sub_label);
 
-    %% --------------------------------------------------------------------
-    % Load transformed electrode information
-    % ---------------------------------------------------------------------
+    %% Load transformed electrode information
 
     electrodesFile = fullfile( ...
         localDataPath, ...
@@ -65,9 +64,7 @@ for ss = 1:numel(all_subjects)
 
     nElectrodes = height(loc_info);
 
-    %% --------------------------------------------------------------------
-    % Load gray/white matter distance
-    % ---------------------------------------------------------------------
+    %% Load gray/white matter distance
 
     gmFile = fullfile( ...
         localDataPath, ...
@@ -82,9 +79,7 @@ for ss = 1:numel(all_subjects)
         'Delimiter', '\t', ...
         'TreatAsEmpty', {'N/A', 'n/a'});
 
-    %% --------------------------------------------------------------------
-    % Load Yeo-7 electrode information
-    % ---------------------------------------------------------------------
+    %% Load Yeo-7 electrode information
 
     yeoFile = fullfile( ...
         localDataPath, ...
@@ -94,9 +89,7 @@ for ss = 1:numel(all_subjects)
 
     yeoInfo = readtable(yeoFile);
 
-    %% --------------------------------------------------------------------
-    % Check electrode correspondence
-    % ---------------------------------------------------------------------
+    %% Check electrode correspondence
 
     if height(gm_wm_info) ~= nElectrodes
         error( ...
@@ -130,9 +123,7 @@ for ss = 1:numel(all_subjects)
             sub_label);
     end
 
-    %% --------------------------------------------------------------------
-    % Initialize variables added to loc_info
-    % ---------------------------------------------------------------------
+    %% Initialize variables added to loc_info
 
     loc_info.CCEPs = zeros(nElectrodes, 1);
     loc_info.runCCEPS = cell(nElectrodes, 1);
@@ -141,9 +132,7 @@ for ss = 1:numel(all_subjects)
     loc_info.gm_wm_relativeDistance = ...
         gm_wm_info.RelativeDistance;
 
-    %% --------------------------------------------------------------------
-    % Determine CCEP availability
-    % ---------------------------------------------------------------------
+    %% Determine CCEP availability
 
     for eli = 1:nElectrodes
 
@@ -176,15 +165,13 @@ for ss = 1:numel(all_subjects)
 
     end
 
-    %% --------------------------------------------------------------------
-    % Assign Visual or Control network
+    %% Assign Visual or Control network
     %
-    % Reproduces the historical Yeo7SubjMaxVertices behavior:
+    % Reproduces historical Yeo7SubjMaxVertices behavior:
     %
     %   Control > Visual     -> Control
     %   Visual = Control = 0 -> no network
     %   Visual >= Control    -> Visual
-    % ---------------------------------------------------------------------
 
     for eli = 1:nElectrodes
 
@@ -207,9 +194,7 @@ for ss = 1:numel(all_subjects)
 
     end
 
-    %% --------------------------------------------------------------------
-    % Select electrodes
-    % ---------------------------------------------------------------------
+    %% Select electrodes
 
     hasCCEP = ...
         loc_info.CCEPs > 0;
@@ -222,8 +207,7 @@ for ss = 1:numel(all_subjects)
     isGrayMatterEligible = ...
         loc_info.gm_wm_relativeDistance >= -1;
 
-    % Preserve historical exact-match behavior:
-    % only electrodes labeled exactly "SOZ" are excluded.
+    % Preserve historical exact-match behavior.
     isNotSOZ = ...
         string(loc_info.seizure_zone) ~= "SOZ";
 
@@ -236,9 +220,7 @@ for ss = 1:numel(all_subjects)
     selectedElectrodes = ...
         string(loc_info.name(Ch2work));
 
-    %% --------------------------------------------------------------------
-    % Save updated loc_info
-    % ---------------------------------------------------------------------
+    %% Save updated loc_info
 
     locInfoOutputDir = fullfile( ...
         localDataPath, ...
@@ -256,9 +238,7 @@ for ss = 1:numel(all_subjects)
 
     save(locInfoFile, 'loc_info');
 
-    %% --------------------------------------------------------------------
-    % Find real bipolar stimulation pairs
-    % ---------------------------------------------------------------------
+    %% Find real bipolar stimulation pairs
 
     ieegDir = fullfile( ...
         localDataPath, ...
@@ -271,14 +251,12 @@ for ss = 1:numel(all_subjects)
         '*_task-ccep_*events.tsv'));
 
     if isempty(eventFiles)
-
         warning( ...
             'No CCEP events files found for sub-%s.', ...
             sub_label);
-
     end
 
-    % Store every valid pair/run combination first.
+    % Store all usable pair/run combinations.
     allPairs = strings(0, 1);
     allRuns = strings(0, 1);
     allTrials = zeros(0, 1);
@@ -296,6 +274,53 @@ for ss = 1:numel(all_subjects)
             eventFiles(ff).folder, ...
             eventFiles(ff).name);
 
+        %% Identify run
+
+        runNumber = extractBetween( ...
+            string(eventFiles(ff).name), ...
+            'ccep_run-', ...
+            '_events');
+
+        if isempty(runNumber) || ismissing(runNumber)
+
+            warning( ...
+                'Could not identify run number from %s.', ...
+                eventFiles(ff).name);
+
+            continue
+
+        end
+
+        %% Require files needed for BSEP preprocessing
+
+        fileStem = [ ...
+            'sub-' sub_label ...
+            '_ses-' ses_label ...
+            '_task-ccep_run-' char(runNumber)];
+
+        channelsFile = fullfile( ...
+            ieegDir, ...
+            [fileStem '_channels.tsv']);
+
+        mefFile = fullfile( ...
+            ieegDir, ...
+            [fileStem '_ieeg.mefd']);
+
+        % A run is usable only if channel metadata and MEF data exist.
+        if ~isfile(channelsFile) || exist(mefFile, 'dir') ~= 7
+
+            fprintf( ...
+                ['Skipping run-%s for sub-%s: ' ...
+                 'preprocessing data incomplete.\n'], ...
+                runNumber, ...
+                sub_label);
+
+            continue
+
+        end
+
+        %% Load events
+
         ev = readtable( ...
             eventsFile, ...
             'FileType', 'text', ...
@@ -311,27 +336,16 @@ for ss = 1:numel(all_subjects)
                 eventFiles(ff).name);
 
             continue
+
         end
 
         stimSites = ...
             string(ev.electrical_stimulation_site);
 
-        runNumber = extractBetween( ...
-            string(eventFiles(ff).name), ...
-            'ccep_run-', ...
-            '_events');
-
-        if isempty(runNumber) || ismissing(runNumber)
-
-            warning( ...
-                'Could not identify run number from %s.', ...
-                eventFiles(ff).name);
-
-            continue
-        end
-
         uniquePairs = ...
             unique(stimSites, 'stable');
+
+        %% Evaluate stimulation pairs
 
         for pp = 1:numel(uniquePairs)
 
@@ -356,22 +370,24 @@ for ss = 1:numel(all_subjects)
             el2Selected = ...
                 ismember(el2, selectedElectrodes);
 
-            % A pair is eligible if at least one of its contacts passed
-            % the electrode-level selection.
+            % Keep pair if at least one contact passed selection.
             if ~(el1Selected || el2Selected)
                 continue
             end
 
-            % Require more than one stimulation trial for this exact
-            % bipolar pair in this run.
-            pairIdx = strcmp(stimSites, stimPair);
-            nTrials = sum(pairIdx);
+            %% Count trials for this exact pair in this run
+
+            pairIdx = ...
+                stimSites == stimPair;
+
+            nTrials = ...
+                sum(pairIdx);
 
             if nTrials <= 1
                 continue
             end
 
-            %% Get network assignments for both contacts
+            %% Get network assignments
 
             idx1 = find( ...
                 string(loc_info.name) == el1, ...
@@ -394,14 +410,7 @@ for ss = 1:numel(all_subjects)
                     loc_info.yeo7VisualControl{idx2});
             end
 
-            %% Assign pair network
-            %
-            % If only one contact passed the selection criteria, use the
-            % network of that selected contact.
-            %
-            % If both contacts passed selection, require them to belong to
-            % the same network. Cross-network pairs are flagged rather than
-            % assigned arbitrarily.
+            %% Assign network to stimulation pair
 
             pairNetwork = "";
 
@@ -433,11 +442,12 @@ for ss = 1:numel(all_subjects)
                         net2);
 
                     continue
+
                 end
 
             end
 
-            %% Store valid pair/run combination
+            %% Store pair/run combination
 
             allPairs(end+1, 1) = ...
                 stimPair;
@@ -461,12 +471,13 @@ for ss = 1:numel(all_subjects)
 
     end
 
-    %% --------------------------------------------------------------------
-    % Select one run per bipolar pair
+    %% Select one run per bipolar stimulation pair
     %
-    % If the same stimulation pair appears in multiple valid runs,
-    % select the first numerical run.
-    % ---------------------------------------------------------------------
+    % If the same pair occurs in multiple usable runs:
+    %
+    %   1. Prefer the run with the largest number of trials.
+    %   2. If runs have the same number of trials, select the first
+    %      numerical run.
 
     if isempty(allPairs)
 
@@ -488,26 +499,49 @@ for ss = 1:numel(all_subjects)
             idx = find( ...
                 allPairs == uniqueStimPairs(ii));
 
-            runNumbers = ...
-                str2double(allRuns(idx));
+            %% Criterion 1: largest number of trials
 
-            if all(~isnan(runNumbers))
+            pairTrials = ...
+                allTrials(idx);
 
-                [~, jj] = ...
-                    min(runNumbers);
+            maxTrials = ...
+                max(pairTrials);
+
+            bestIdx = ...
+                idx(pairTrials == maxTrials);
+
+            %% Criterion 2: first numerical run
+
+            if numel(bestIdx) > 1
+
+                runNumbers = ...
+                    str2double(allRuns(bestIdx));
+
+                if all(~isnan(runNumbers))
+
+                    [~, jj] = ...
+                        min(runNumbers);
+
+                else
+
+                    % Fallback for unexpected non-numeric run labels.
+                    [~, order] = ...
+                        sort(allRuns(bestIdx));
+
+                    jj = ...
+                        order(1);
+
+                end
+
+                keepIdx(ii) = ...
+                    bestIdx(jj);
 
             else
 
-                % Fallback for unexpected non-numeric run labels.
-                [~, order] = ...
-                    sort(allRuns(idx));
-
-                jj = order(1);
+                keepIdx(ii) = ...
+                    bestIdx;
 
             end
-
-            keepIdx(ii) = ...
-                idx(jj);
 
         end
 
@@ -525,7 +559,7 @@ for ss = 1:numel(all_subjects)
         networkYeo = ...
             allPairNetworks(keepIdx);
 
-        % Preserve the historical vcm_Subjects representation:
+        % Preserve historical vcm_Subjects representation:
         % each table cell contains one run string.
         run = cell(numel(selectedRuns), 1);
 
@@ -535,9 +569,7 @@ for ss = 1:numel(all_subjects)
 
     end
 
-    %% --------------------------------------------------------------------
-    % Create subject stimulation-pair table
-    % ---------------------------------------------------------------------
+    %% Create subject stimulation-pair table
 
     subjField = ...
         matlab.lang.makeValidName(sub_label);
@@ -548,9 +580,7 @@ for ss = 1:numel(all_subjects)
         run, ...
         networkYeo);
 
-    %% --------------------------------------------------------------------
-    % Print summary
-    % ---------------------------------------------------------------------
+    %% Print summary
 
     fprintf( ...
         'sub-%s: %d electrodes passed selection criteria.\n', ...
