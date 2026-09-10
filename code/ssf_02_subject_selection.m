@@ -25,9 +25,29 @@ projectDir = fileparts(codeDir);
 localDataPath = fullfile(projectDir, 'data');
 
 addpath(genpath(fullfile(codeDir, 'functions')));
+
 %% Subjects
 
-%all_subjects = {'01', '02'};
+subjectDirs = dir(fullfile( ...
+    localDataPath, ...
+    'derivatives', ...
+    'electrodes2rsfMRI', ...
+    'sub-*'));
+
+subjectDirs = subjectDirs([subjectDirs.isdir]);
+
+all_subjects = erase( ...
+    string({subjectDirs.name}), ...
+    "sub-");
+
+all_subjects = cellstr(sort(all_subjects));
+
+if isempty(all_subjects)
+    error('No subjects found in derivatives/electrodes2rsfMRI.');
+end
+
+fprintf('Subjects found: %d\n', numel(all_subjects));
+
 
 %% Select subjects and electrodes
 
