@@ -17,6 +17,15 @@
 clc;
 clearvars;
 
+%% Dependencies
+%
+% Required external toolboxes/repositories:
+%   - vistasoft
+%   - mnl_ieegBasics
+%   - mnl_DataCuration
+%   - SPM
+%
+% Required project functions are listed in the README.
 
 %% Project paths
 
@@ -28,17 +37,37 @@ localDataPath = fullfile(projectDir, 'data');
 
 addpath(genpath(fullfile(codeDir, 'functions')));
 
-subjects = {'01', '02'};
+%% Subjects and analysis settings
 
-%% Dependencies
-%
-% Required external toolboxes/repositories:
-%   - vistasoft
-%   - mnl_ieegBasics
-%   - mnl_DataCuration
-%   - SPM
-%
-% Required project functions are listed in the README.
+subjectDirs = dir(fullfile( ...
+    localDataPath, ...
+    'derivatives', ...
+    'T1electrodeCoordinates', ...
+    'sub-*'));
+
+subjectDirs = subjectDirs([subjectDirs.isdir]);
+
+subjects = erase( ...
+    string({subjectDirs.name}), ...
+    "sub-");
+
+subjects = cellstr(sort(subjects));
+
+if isempty(subjects)
+    error( ...
+        ['No subjects found in ' ...
+         'data/derivatives/T1electrodeCoordinates/.']);
+end
+
+fprintf('Subjects found: %d\n', numel(subjects));
+
+fmriSession = 'compact3T01';
+ieegSession = 'ieeg01';
+
+mmDistance = 3;   % Radius around electrode for Yeo assignment, mm
+yeo = 7;          % Yeo parcellation
+hem = [1 2];      % Left and right hemispheres
+
 
 %% Register electrode coordinates to resting-state fMRI T1 space
 
