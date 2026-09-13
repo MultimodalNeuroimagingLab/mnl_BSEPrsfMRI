@@ -1,7 +1,6 @@
 # mnl_BSEPrsfMRI
-integrating resting state fMRI with BSEPS
 
-# BSEP–rs-fMRI Analysis Workflow
+## BSEP–rs-fMRI Analysis Workflow
 
 This repository contains the analysis workflow used to integrate brain stimulation evoked potentials (BSEPs) with resting-state fMRI functional connectivity.
 
@@ -16,6 +15,8 @@ The workflow includes:
 - integration of electrophysiology and rs-fMRI data
 - functional connectivity analysis
 - within-subject FC–EC correlation visualization
+
+Subject-specific data are not included in this repository.
 
 ---
 
@@ -39,7 +40,14 @@ The repository should contain approximately:
 mnl_BSEPrsfMRI/
 ├── code/
 │   ├── functions/
+│   │   └── ssf_CAR64blocks_percent.m
+│   │
 │   ├── preprocessing/
+│   │   ├── Auto_tedana_last.py
+│   │   ├── fmrprepServer.txt
+│   │   ├── ssf_ribbon_to_tedana.sh
+│   │   └── ssf_project_yeo7_to_subject.sh
+│   │
 │   ├── ssf_01_electrode_network_mapping.m
 │   ├── ssf_02_subject_selection.m
 │   ├── ssf_03_preprocess_bsep_crp.m
@@ -47,6 +55,7 @@ mnl_BSEPrsfMRI/
 │   ├── ssf_05_integrate_bsep_rsfmri_data.m
 │   ├── ssf_06_compute_fc_analysis_table.m
 │   └── ssf_07_plot_within_subject_fc_ec_correlations.m
+│
 ├── LICENSE
 └── README.md
 ```
@@ -68,6 +77,8 @@ All subject-specific data and generated derivatives should remain inside:
 ```text
 mnl_BSEPrsfMRI/data/
 ```
+
+Subject identifiers, subject data, and local filesystem paths should not be committed to the public repository.
 
 ---
 
@@ -146,7 +157,7 @@ The following steps must be completed for each subject before running MATLAB Sta
 
 The resting-state fMRI data are processed with fMRIPrep.
 
-For multi-echo data, it is important to include:
+For multi-echo data, include:
 
 ```text
 --me-output-echos
@@ -154,7 +165,7 @@ For multi-echo data, it is important to include:
 
 because the individual preprocessed echoes are later used as inputs to tedana.
 
-An example fMRIPrep command is provided in:
+An example fMRIPrep configuration is provided in:
 
 ```text
 code/preprocessing/fmrprepServer.txt
@@ -209,12 +220,21 @@ code/preprocessing/Auto_tedana_last.py
 ```
 
 The script:
+
 - identifies the preprocessed multi-echo BOLD files
 - identifies the corresponding BIDS JSON files
 - reads the echo times from the JSON files
 - identifies the fMRIPrep brain mask
 - creates the subject tedana output directory
 - runs `tedana_workflow`
+
+First confirm that tedana is available:
+
+```bash
+python -c "import tedana; print(tedana.__version__)"
+```
+
+Example:
 
 ```bash
 PROJECT=/path/to/mnl_BSEPrsfMRI
@@ -243,25 +263,23 @@ After tedana, the cortical gray-matter ribbon mask must be resampled to the teda
 The repository includes:
 
 ```text
-code/preprocessing/ribbon2tedana.sh
+code/preprocessing/ssf_ribbon_to_tedana.sh
 ```
 
-The main operations are:
+This script automatically determines the project directory from its location in the repository.
+
+Run it from the repository root:
 
 ```bash
-flirt \
-    -in <ribbon_mask> \
-    -ref <tedana_bold> \
-    -out <ribbon_tedana_space> \
-    -applyxfm \
-    -usesqform
-
-fslmaths \
-    <ribbon_tedana_space> \
-    -thr 0.5 \
-    -bin \
-    <ribbon_tedana_space_bin>
+bash code/preprocessing/ssf_ribbon_to_tedana.sh 01
 ```
+
+The subject label should be provided without the `sub-` prefix. The script also accepts a label containing `sub-` and removes the prefix automatically.
+
+The script uses FSL to:
+
+1. resample the fMRIPrep cortical ribbon mask to tedana BOLD space using `flirt`
+2. threshold and binarize the resampled mask using `fslmaths`
 
 The final file required by MATLAB Stage 04 is:
 
@@ -272,51 +290,58 @@ sub-<label>_ses-compact3T01_desc-ribbon_mask_tedanaSpace_bin.nii.gz
 
 This mask is used to restrict electrode ROIs to gray-matter voxels.
 
-### Important
-
-`ribbon2tedana.sh` may contain local path definitions from the original development environment.
+The script requires FSL commands `flirt` and `fslmaths` to be available on the system `PATH`.
 
 ---
 
 ## 5. Project the Yeo 7-network atlas to the subject surface
 
-Use FreeSurfer `mri_surf2surf` to project the Yeo 7-network atlas from `fsaverage` to the individual subject surface.
-
 The repository includes:
 
 ```text
-code/preprocessing/Yeo7_surf2surf.sh
+code/preprocessing/ssf_project_yeo7_to_subject.sh
 ```
 
-The script performs the projection separately for the left and right hemispheres.
+This script uses FreeSurfer `mri_surf2surf` to project the Yeo 7-network atlas from `fsaverage` to the individual subject surface.
 
-Example:
+Run:
 
 ```bash
-bash code/preprocessing/Yeo7_surf2surf.sh 01
+bash code/preprocessing/ssf_project_yeo7_to_subject.sh 01
 ```
+
+The script automatically determines:
+
+```text
+data/derivatives/freesurfer/
+```
+
+as the FreeSurfer `SUBJECTS_DIR`.
+
+The following source atlas files must exist under:
+
+```text
+data/derivatives/freesurfer/fsaverage/label/
+```
+
+```text
+lh.Yeo2011_7Networks_N1000.annot
+rh.Yeo2011_7Networks_N1000.annot
+```
+
+The script projects the atlas separately for the left and right hemispheres.
 
 Verify that the subject FreeSurfer directory contains:
 
 ```text
-label/lh.Yeo2011_7Networks_N1000.annot
-label/rh.Yeo2011_7Networks_N1000.annot
+data/derivatives/freesurfer/sub-<label>/label/
+├── lh.Yeo2011_7Networks_N1000.annot
+└── rh.Yeo2011_7Networks_N1000.annot
 ```
 
 These subject-specific annotations are required before the electrode network assignment performed in MATLAB Stage 01.
 
-### Important
-
-
-Before running `Yeo7_surf2surf.sh` on a new computer, inspect and update:
-
-```text
-SUBJECTS_DIR
-fsaverage location
-subject FreeSurfer directory
-```
-
-as needed.
+The script requires FreeSurfer `mri_surf2surf` to be available on the system `PATH`.
 
 ---
 
@@ -349,6 +374,11 @@ data/
     │               └── sub-<label>_ses-compact3T01_desc-ribbon_mask_tedanaSpace_bin.nii.gz
     │
     ├── freesurfer/
+    │   ├── fsaverage/
+    │   │   └── label/
+    │   │       ├── lh.Yeo2011_7Networks_N1000.annot
+    │   │       └── rh.Yeo2011_7Networks_N1000.annot
+    │   │
     │   └── sub-<label>/
     │       └── label/
     │           ├── lh.Yeo2011_7Networks_N1000.annot
@@ -441,6 +471,26 @@ which fitlm
 ```
 
 Each command should return a valid file path.
+
+### Check `filtfilt` before Stage 03
+
+Stage 03 uses `ieeg_notch`, which requires the MATLAB Signal Processing Toolbox implementation of `filtfilt`.
+
+Check:
+
+```matlab
+which filtfilt -all
+```
+
+The MATLAB Signal Processing Toolbox implementation should be the version used.
+
+If an external FieldTrip/SPM copy of `filtfilt.m` appears first on the MATLAB path, Stage 03 may fail with:
+
+```text
+Usage: y=filtfilt(b,a,x)
+```
+
+If this occurs, remove the conflicting external `signal` directory from the MATLAB path before running Stage 03.
 
 ---
 
@@ -546,9 +596,15 @@ The stage performs:
 - BSEP/CCEP trial loading
 - baseline correction
 - recording-channel selection
-- common-average rereferencing
-- notch filtering
+- common-average rereferencing using `ssf_CAR64blocks_percent`
+- notch filtering for CAR-channel selection
 - CRP analysis
+
+The common-average reference uses the lowest-variance 25% of eligible recording channels.
+
+For recordings sampled at 4800 Hz, the common average is calculated across all eligible channels.
+
+For recordings sampled at 2048 Hz, the common average is calculated independently within 64-channel blocks.
 
 Recording-channel selection uses information from `channels.tsv` and electrode localization information, including SOZ labels and distance from stimulation contacts.
 
@@ -744,12 +800,16 @@ data/
     └── figures/
 ```
 
+---
+
 ## MATLAB and computing environment
 
 The analysis pipeline was tested using MATLAB R2024a on Apple silicon macOS systems, including:
 
+```text
 MacBook Pro, Apple M4 Max, 128 GB RAM
 Mac Studio, Apple M3 Ultra, 96 GB RAM
+```
 
 Testing was performed under macOS Tahoe 26.6.2.
 
